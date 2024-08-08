@@ -169,6 +169,7 @@ const DEFAULT_OUTPUT_MAX_TOKENS = 1024;
       if (url.pathname === "/api" && request.method === "POST") {
         const content = await request.json();
         const prompt = content.prompt;
+      const jsonSchema = JSON.parse(content.jsonSchema);
   
         if (!prompt) {
           return new Response(JSON.stringify({ error: 'No prompt provided' }), {
@@ -184,14 +185,14 @@ const DEFAULT_OUTPUT_MAX_TOKENS = 1024;
 
         try {
           const results = await Promise.all([
-          getGeminiResponse(prompt, 'gemini-1.5-flash', env),
-          getGeminiResponse(prompt, 'gemini-1.5-pro', env),
-          getGeminiResponse(prompt, 'gemini-1.5-pro-exp-0801', env),
-          getChatGPTResponse(prompt, 'gpt-4o-mini', env),
-          getChatGPTResponse(prompt, 'gpt-4o-2024-08-06', env),
-          getClaudeResponse(prompt, 'claude-3-haiku-20240307', env),
-          getClaudeResponse(prompt, 'claude-3-5-sonnet-20240620', env),
-          getClaudeResponse(prompt, 'claude-3-opus-20240229', env)
+          getGeminiResponse(prompt, 'gemini-1.5-flash', env, jsonSchema),
+          getGeminiResponse(prompt, 'gemini-1.5-pro', env, jsonSchema),
+          getGeminiResponse(prompt, 'gemini-1.5-pro-exp-0801', env, jsonSchema),
+          getChatGPTResponse(prompt, 'gpt-4o-mini', env, jsonSchema),
+          getChatGPTResponse(prompt, 'gpt-4o-2024-08-06', env, jsonSchema),
+          getClaudeResponse(prompt, 'claude-3-haiku-20240307', env, jsonSchema),
+          getClaudeResponse(prompt, 'claude-3-5-sonnet-20240620', env, jsonSchema),
+          getClaudeResponse(prompt, 'claude-3-opus-20240229', env, jsonSchema)
         ]);
 
           const response = {
@@ -227,14 +228,21 @@ const DEFAULT_OUTPUT_MAX_TOKENS = 1024;
     }
   };
   
-async function getGeminiResponse(prompt, model, env) {
+async function getGeminiResponse(prompt, model, env, jsonSchema) {
   try {
     const apiKey = env.GEMINI_API_KEY;
     if (!apiKey) {
       throw new Error('Gemini API key is missing');
     }
 
-    const url = `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${apiKey}`;
+    // const url = `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${apiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+    if (jsonSchema) {
+      prompt = `${prompt}
+      Use the following JSON schema for your response:
+      ${JSON.stringify(jsonSchema, null, 2)}`
+    }
     const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -242,6 +250,7 @@ async function getGeminiResponse(prompt, model, env) {
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
           maxOutputTokens: parseInt(env.OUTPUT_MAX_TOKENS) || DEFAULT_OUTPUT_MAX_TOKENS,
+          responseMimeType: jsonSchema ? "application/json" : "text/plain",
         }
       })
     });
@@ -259,21 +268,36 @@ async function getGeminiResponse(prompt, model, env) {
   }
 }
   
-  async function getChatGPTResponse(prompt, model, env) {
+async function getChatGPTResponse(prompt, model, env, jsonSchema) {
     try {
       const apiKey = env.OPENAI_API_KEY;
       const url = 'https://api.openai.com/v1/chat/completions';
+    const requestBody = {
+      model: model,
+      max_tokens: parseInt(env.OUTPUT_MAX_TOKENS) || DEFAULT_OUTPUT_MAX_TOKENS,
+      messages: [{ role: 'user', content: prompt }],
+    }
+
+    if (jsonSchema && typeof jsonSchema === 'object') {
+      requestBody.response_format = {
+        "type": "json_schema",
+        "json_schema": {
+          "name": "my_custom",
+          "schema": jsonSchema,
+          "strict": true
+        }
+      };
+    } else {
+      console.error("Invalid jsonSchema provided. Must be an object.");
+    }
+    
       const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${apiKey}`
         },
-        body: JSON.stringify({
-          model: model,
-        max_tokens: parseInt(env.OUTPUT_MAX_TOKENS) || DEFAULT_OUTPUT_MAX_TOKENS,
-          messages: [{ role: 'user', content: prompt }]
-        })
+      body: JSON.stringify(requestBody)
       });
       const data = await response.json();
       return data.choices[0].message.content;
@@ -283,10 +307,25 @@ async function getGeminiResponse(prompt, model, env) {
     }
   }
 
-  async function getClaudeResponse(prompt, model, env) {
+async function getClaudeResponse(prompt, model, env, jsonSchema) {
     try {
       const apiKey = env.ANTHROPIC_API_KEY;
       const url = 'https://api.anthropic.com/v1/messages';
+    const requestBody = {
+      model: model,
+      max_tokens: parseInt(env.OUTPUT_MAX_TOKENS) || DEFAULT_OUTPUT_MAX_TOKENS,
+      messages: [{ role: 'user', content: prompt }]
+    }
+    if (jsonSchema) {
+      requestBody.tools = [
+        {
+          "name": "my_custom",
+          "description": "Transform Output into My Custom JSON Schema.",
+          "input_schema": jsonSchema
+        }
+      ],
+      requestBody.tool_choice = { "type": "tool", "name": "my_custom" }
+    }
       const response = await fetch(url, {
         method: 'POST',
         headers: {
@@ -294,17 +333,16 @@ async function getGeminiResponse(prompt, model, env) {
           'x-api-key': apiKey,
           'anthropic-version': '2023-06-01'
         },
-        body: JSON.stringify({
-          model: model,
-        max_tokens: parseInt(env.OUTPUT_MAX_TOKENS) || DEFAULT_OUTPUT_MAX_TOKENS,
-          messages: [{ role: 'user', content: prompt }]
-        })
+      body: JSON.stringify(requestBody)
       });
       
       const data = await response.json();
       console.log(`Claude API Response for ${model}:`, JSON.stringify(data, null, 2));
       
       if (data.content && Array.isArray(data.content) && data.content.length > 0) {
+      if (jsonSchema && data.content[0].input) {
+        return data.content[0].input;
+      }
         return data.content[0].text;
       } else if (data.error) {
         throw new Error(`Claude API Error: ${data.error.message}`);
