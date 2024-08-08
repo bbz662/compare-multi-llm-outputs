@@ -20,6 +20,8 @@ const corsHeaders = {
   
       <script type="text/babel">
           const { useState } = React;
+        const { createRoot } = ReactDOM;
+
         const INFO_SYMBOL = "ℹ";
         const CLOSE_SYMBOL = "×";
 
@@ -123,7 +125,9 @@ const corsHeaders = {
         };
   
           const LLMComparisonApp = () => {
+            const [prompt, setPrompt] = React.useState('');
             const [jsonSchema, setJsonSchema] = React.useState('');
+            const [results, setResults] = React.useState({
                   'gemini-1.5-flash': '',
                   'gemini-1.5-pro': '',
                 'gemini-1.5-pro-exp-0801': '',
@@ -133,6 +137,8 @@ const corsHeaders = {
                   'claude-3-5-sonnet-20240620': '',
                   'claude-3-opus-20240229': ''
               });
+            const [loading, setLoading] = React.useState(false);
+            const [error, setError] = React.useState('');
             const [isPanelOpen, setIsPanelOpen] = React.useState(false);
             const [panelContent, setPanelContent] = React.useState(null);
   
@@ -167,14 +173,23 @@ const corsHeaders = {
                       });
   
                       if (!response.ok) {
-                          throw new Error(\`HTTP error! status: \${response.status}\`);
+                        throw new Error('HTTP error! status: ' + response.status);
                       }
   
                       const data = await response.json();
-                      setResults(data);
+
+                    setResults(prevResults => {
+                        const updatedResults = { ...prevResults };
+                        Object.keys(prevResults).forEach(key => {
+                            if (key in data) {
+                                updatedResults[key] = data[key];
+                            }
+                        });
+                        return updatedResults;
+                    });
                   } catch (err) {
                       console.error('Error occurred:', err);
-                      setError(\`An error occurred while fetching results: \${err.message}\`);
+                    setError('An error occurred while fetching results: ' + err.message);
                   } finally {
                       setLoading(false);
                   }
@@ -323,7 +338,11 @@ const corsHeaders = {
           };
   
           const root = ReactDOM.createRoot(document.getElementById('root'));
-          root.render(<LLMComparisonApp />);
+        root.render(
+            <React.StrictMode>
+                <LLMComparisonApp />
+            </React.StrictMode>
+        );
       </script>
   </body>
   </html>`;
@@ -353,7 +372,6 @@ const DEFAULT_OUTPUT_MAX_TOKENS = 1024;
           });
         }
   
-        console.log('Received prompt:', prompt);
         if (!env.GEMINI_API_KEY || !env.OPENAI_API_KEY || !env.ANTHROPIC_API_KEY) {
           throw new Error('One or more API keys are missing');
         }
@@ -429,13 +447,10 @@ async function getGeminiResponse(prompt, model, env, jsonSchema) {
         }
       })
     });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(`Gemini API error: ${response.status} ${JSON.stringify(errorData)}`);
-    }
-
     const data = await response.json();
+    if (!response.ok) {
+      throw new Error(`${response.status} ${JSON.stringify(data, null, 2)}`);
+    }
     return data.candidates[0].content.parts[0].text;
   } catch (error) {
     console.error(`Error in getGeminiResponse (${model}):`, error);
@@ -475,6 +490,9 @@ async function getChatGPTResponse(prompt, model, env, jsonSchema) {
       body: JSON.stringify(requestBody)
       });
       const data = await response.json();
+    if (!response.ok) {
+      throw new Error(`${response.status} ${JSON.stringify(data, null, 2)}`);
+    }
       return data.choices[0].message.content;
     } catch (error) {
       console.error(`Error in getChatGPTResponse (${model}):`, error);
@@ -512,7 +530,9 @@ async function getClaudeResponse(prompt, model, env, jsonSchema) {
       });
       
       const data = await response.json();
-      console.log(`Claude API Response for ${model}:`, JSON.stringify(data, null, 2));
+    if (!response.ok) {
+      throw new Error(`${response.status} ${JSON.stringify(data, null, 2)}`);
+    }
       
       if (data.content && Array.isArray(data.content) && data.content.length > 0) {
       if (jsonSchema && data.content[0].input) {
@@ -520,7 +540,7 @@ async function getClaudeResponse(prompt, model, env, jsonSchema) {
       }
         return data.content[0].text;
       } else if (data.error) {
-        throw new Error(`Claude API Error: ${data.error.message}`);
+      throw new Error(`${data.error.message}`);
       } else {
         throw new Error('Unexpected response structure from Claude API');
       }
