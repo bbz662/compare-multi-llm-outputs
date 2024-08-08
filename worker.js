@@ -38,11 +38,16 @@ const corsHeaders = {
               />
           ));
   
-          const Button = React.memo(({ onClick, disabled, children }) => (
+        const Button = React.memo(({ onClick, disabled, children, className }) => (
               <button
                   onClick={onClick}
                   disabled={disabled}
-                  className="px-4 py-2 font-bold text-white bg-blue-500 rounded-full hover:bg-blue-700 focus:outline-none focus:shadow-outline disabled:opacity-50"
+                className={classNames(
+                    "px-4 py-2 font-bold text-white bg-blue-500 rounded-full",
+                    "hover:bg-blue-700 focus:outline-none focus:shadow-outline",
+                    disabled && "opacity-50",
+                    className
+                )}
               >
                   {children}
               </button>
@@ -59,9 +64,38 @@ const corsHeaders = {
               />
           ));
   
-          const Card = React.memo(({ title, content }) => (
+        const Card = React.memo(({ title, content }) => {
+            const renderContent = () => {
+                if (typeof content === 'string') {
+                    try {
+                        const parsedContent = JSON.parse(content);
+                        return (
+                            <pre className="whitespace-pre-wrap overflow-x-auto bg-gray-100 p-2 rounded">
+                                {JSON.stringify(parsedContent, null, 2)}
+                            </pre>
+                        );
+                    } catch (e) {
+                        return <p className="whitespace-pre-wrap">{content}</p>;
+                    }
+                } else if (typeof content === 'object' && content !== null) {
+                    return (
+                        <pre className="whitespace-pre-wrap overflow-x-auto bg-gray-100 p-2 rounded">
+                            {JSON.stringify(content, null, 2)}
+                        </pre>
+                    );
+                } else {
+                    return <p className="whitespace-pre-wrap">{String(content)}</p>;
+                }
+            };
+
+            return (
               <div className="bg-white shadow-md rounded-lg p-6 mb-4">
                   <h3 className="text-lg font-semibold mb-2">{title}</h3>
+                    {renderContent()}
+                </div>
+            );
+        });
+
         const SlideInPanel = ({ isOpen, onClose, children, title }) => {
             return (
                 <div className={classNames(
