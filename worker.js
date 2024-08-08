@@ -20,6 +20,12 @@ const corsHeaders = {
   
       <script type="text/babel">
           const { useState } = React;
+        const INFO_SYMBOL = "ℹ";
+        const CLOSE_SYMBOL = "×";
+
+        const classNames = (...classes) => {
+            return classes.filter(Boolean).join(' ');
+        };
   
           const Input = React.memo(({ id, type, value, onChange, placeholder }) => (
               <input
@@ -56,9 +62,31 @@ const corsHeaders = {
           const Card = React.memo(({ title, content }) => (
               <div className="bg-white shadow-md rounded-lg p-6 mb-4">
                   <h3 className="text-lg font-semibold mb-2">{title}</h3>
-                  <p className="whitespace-pre-wrap">{content}</p>
+        const SlideInPanel = ({ isOpen, onClose, children, title }) => {
+            return (
+                <div className={classNames(
+                    "fixed inset-y-0 right-0 bg-white shadow-lg transform",
+                    "w-96 sm:w-1/2 md:w-1/3 lg:w-1/4", // 幅の調整
+                    isOpen ? "translate-x-0" : "translate-x-full",
+                    "transition-transform duration-300 ease-in-out",
+                    "flex flex-col"
+                )}>
+                    <div className="p-4 flex-shrink-0">
+                        <button 
+                            onClick={onClose} 
+                            className="absolute top-2 right-2 text-gray-500 hover:text-gray-700 text-xl font-bold"
+                            aria-label="Close panel"
+                        >
+                            {CLOSE_SYMBOL}
+                        </button>
+                        <h2 className="text-lg font-semibold mb-4">{title}</h2>
+                    </div>
+                    <div className="flex-grow overflow-y-auto px-4">
+                        {children}
+                    </div>
               </div>
-          ));
+            );
+        };
   
           const LLMComparisonApp = () => {
             const [jsonSchema, setJsonSchema] = React.useState('');
@@ -71,8 +99,8 @@ const corsHeaders = {
                   'claude-3-5-sonnet-20240620': '',
                   'claude-3-opus-20240229': ''
               });
-              const [loading, setLoading] = useState(false);
-              const [error, setError] = useState('');
+            const [isPanelOpen, setIsPanelOpen] = React.useState(false);
+            const [panelContent, setPanelContent] = React.useState(null);
   
               const handlePromptChange = (e) => {
                   setPrompt(e.target.value);
@@ -117,13 +145,74 @@ const corsHeaders = {
                       setLoading(false);
                   }
               };
+
+            const handleShowExamples = (type) => {
+                if (type === 'jsonSchema') {
+                    setPanelContent({
+                        title: 'JSON Schema Examples',
+                        examples: jsonSchemaExamples,
+                        handleUse: (example) => {
+                            setJsonSchema(JSON.stringify(example.schema, null, 2));
+                            setIsPanelOpen(false);
+                        }
+                    });
+                } else if (type === 'prompt') {
+                    setPanelContent({
+                        title: 'Prompt Examples',
+                        examples: promptExamples,
+                        handleUse: (example) => {
+                            setPrompt(example.prompt);
+                            setIsPanelOpen(false);
+                        }
+                    });
+                }
+                setIsPanelOpen(true);
+            };
+
+            const handleClosePanel = () => {
+                setIsPanelOpen(false);
+            };
+
+            const jsonSchemaExamples = [
+              {
+                  name: "Construct Data",
+                  schema: {
+                      type: "object",
+                      properties: {
+                          description: { type: "string" },
+                          reason: { type: "string" },
+                      },
+                      required: ["description", "reason"],
+                      additionalProperties: false
+                  }
+              },
+            ];
+
+            const promptExamples = [
+                {
+                    name: "シンプルな質問",
+                    prompt: "人工知能の倫理的な課題について簡潔に説明してください。"
+                },
+            ];
   
               return (
                   <div className="container mx-auto p-4">
                       <h1 className="text-2xl font-bold mb-4">LLM Comparison App - Multiple Models</h1>
                       
                       <div className="mb-4">
+                        <div className="flex items-center">
                           <label htmlFor="prompt" className="block text-sm font-medium text-gray-700">Prompt</label>
+                            <button 
+                                onClick={() => handleShowExamples('prompt')}
+                                className={classNames(
+                                    "ml-2 p-1 rounded-full text-blue-500",
+                                    "hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                )}
+                                aria-label="Show Prompt examples"
+                            >
+                                {INFO_SYMBOL}
+                            </button>
+                        </div>
                           <Textarea
                               id="prompt"
                               value={prompt}
@@ -136,6 +225,16 @@ const corsHeaders = {
                     <div className="mb-4">
                         <div className="flex items-center">
                             <label htmlFor="jsonSchema" className="block text-sm font-medium text-gray-700">JSON Schema (Optional)</label>
+                            <button 
+                                onClick={() => handleShowExamples('jsonSchema')}
+                                className={classNames(
+                                    "ml-2 p-1 rounded-full text-blue-500",
+                                    "hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                )}
+                                aria-label="Show JSON Schema examples"
+                            >
+                                {INFO_SYMBOL}
+                            </button>
                         </div>
                         <Textarea
                             id="jsonSchema"
@@ -162,6 +261,29 @@ const corsHeaders = {
                               <Card key={model} title={model} content={result || 'No result yet'} />
                           ))}
                       </div>
+
+                    <SlideInPanel 
+                        isOpen={isPanelOpen} 
+                        onClose={handleClosePanel}
+                        title={panelContent?.title || ''}
+                    >
+                        {panelContent && panelContent.examples.map((example, index) => (
+                            <div key={index} className="mb-6">
+                                <h3 className="font-medium text-lg mb-2">{example.name}</h3>
+                                <div className="bg-gray-100 p-3 rounded text-sm overflow-x-auto">
+                                    <pre className="whitespace-pre-wrap break-all">
+                                        {example.schema ? JSON.stringify(example.schema, null, 2) : example.prompt}
+                                    </pre>
+                                </div>
+                                <Button 
+                                    onClick={() => panelContent.handleUse(example)}
+                                    className="mt-3"
+                                >
+                                    Use This Example
+                                </Button>
+                            </div>
+                        ))}
+                    </SlideInPanel>
                   </div>
               );
           };
