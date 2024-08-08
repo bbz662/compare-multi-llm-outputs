@@ -153,6 +153,7 @@ const corsHeaders = {
   </body>
   </html>`;
   
+const DEFAULT_OUTPUT_MAX_TOKENS = 1024;
   export default {
     async fetch(request, env) {
       const url = new URL(request.url);
@@ -240,7 +241,7 @@ async function getGeminiResponse(prompt, model, env) {
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
-          "maxOutputTokens": 1024,
+          maxOutputTokens: parseInt(env.OUTPUT_MAX_TOKENS) || DEFAULT_OUTPUT_MAX_TOKENS,
         }
       })
     });
@@ -270,7 +271,7 @@ async function getGeminiResponse(prompt, model, env) {
         },
         body: JSON.stringify({
           model: model,
-          max_tokens: 1024,
+        max_tokens: parseInt(env.OUTPUT_MAX_TOKENS) || DEFAULT_OUTPUT_MAX_TOKENS,
           messages: [{ role: 'user', content: prompt }]
         })
       });
@@ -295,7 +296,7 @@ async function getGeminiResponse(prompt, model, env) {
         },
         body: JSON.stringify({
           model: model,
-          max_tokens: 1024,
+        max_tokens: parseInt(env.OUTPUT_MAX_TOKENS) || DEFAULT_OUTPUT_MAX_TOKENS,
           messages: [{ role: 'user', content: prompt }]
         })
       });
