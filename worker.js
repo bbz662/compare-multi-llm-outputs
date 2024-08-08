@@ -61,8 +61,7 @@ const corsHeaders = {
           ));
   
           const LLMComparisonApp = () => {
-              const [prompt, setPrompt] = useState('');
-              const [results, setResults] = useState({
+            const [jsonSchema, setJsonSchema] = React.useState('');
                   'gemini-1.5-flash': '',
                   'gemini-1.5-pro': '',
                 'gemini-1.5-pro-exp-0801': '',
@@ -78,6 +77,10 @@ const corsHeaders = {
               const handlePromptChange = (e) => {
                   setPrompt(e.target.value);
               };
+
+            const handleJsonSchemaChange = (e) => {
+                setJsonSchema(e.target.value);
+            };
   
               const handleSubmit = async () => {
                   if (!prompt.trim()) {
@@ -95,7 +98,10 @@ const corsHeaders = {
                           headers: {
                               'Content-Type': 'application/json',
                           },
-                          body: JSON.stringify({ prompt }),
+                        body: JSON.stringify({ 
+                            prompt,
+                            jsonSchema: jsonSchema.trim() ? jsonSchema : undefined
+                        }),
                       });
   
                       if (!response.ok) {
@@ -126,6 +132,19 @@ const corsHeaders = {
                               rows={4}
                           />
                       </div>
+
+                    <div className="mb-4">
+                        <div className="flex items-center">
+                            <label htmlFor="jsonSchema" className="block text-sm font-medium text-gray-700">JSON Schema (Optional)</label>
+                        </div>
+                        <Textarea
+                            id="jsonSchema"
+                            value={jsonSchema}
+                            onChange={handleJsonSchemaChange}
+                            placeholder="Enter your JSON schema here (optional)"
+                            rows={4}
+                        />
+                    </div>
   
                       <Button onClick={handleSubmit} disabled={loading}>
                           {loading ? 'Submitting...' : 'Submit'}
