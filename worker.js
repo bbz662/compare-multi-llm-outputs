@@ -65,8 +65,9 @@ const corsHeaders = {
               const [results, setResults] = useState({
                   'gemini-1.5-flash': '',
                   'gemini-1.5-pro': '',
+                'gemini-1.5-pro-exp-0801': '',
                   'gpt-4o-mini': '',
-                  'gpt-4o': '',
+                'gpt-4o-2024-08-06': '',
                   'claude-3-haiku-20240307': '',
                   'claude-3-5-sonnet-20240620': '',
                   'claude-3-opus-20240229': ''
@@ -182,25 +183,25 @@ const corsHeaders = {
 
         try {
           const results = await Promise.all([
-            getGeminiResponse(prompt, 'gemini-1.5-flash', env),
-            getGeminiResponse(prompt, 'gemini-1.5-pro', env),
-            getChatGPTResponse(prompt, 'gpt-4o-mini', env),
-            getChatGPTResponse(prompt, 'gpt-4o', env),
-            getClaudeResponse(prompt, 'claude-3-haiku-20240307', env),
-            getClaudeResponse(prompt, 'claude-3-5-sonnet-20240620', env),
-            getClaudeResponse(prompt, 'claude-3-opus-20240229', env)
-          ]);
-  
-          console.log('API responses received');
+          getGeminiResponse(prompt, 'gemini-1.5-flash', env),
+          getGeminiResponse(prompt, 'gemini-1.5-pro', env),
+          getGeminiResponse(prompt, 'gemini-1.5-pro-exp-0801', env),
+          getChatGPTResponse(prompt, 'gpt-4o-mini', env),
+          getChatGPTResponse(prompt, 'gpt-4o-2024-08-06', env),
+          getClaudeResponse(prompt, 'claude-3-haiku-20240307', env),
+          getClaudeResponse(prompt, 'claude-3-5-sonnet-20240620', env),
+          getClaudeResponse(prompt, 'claude-3-opus-20240229', env)
+        ]);
 
           const response = {
             'gemini-1.5-flash': results[0],
             'gemini-1.5-pro': results[1],
-            'gpt-4o-mini': results[2],
-            'gpt-4o': results[3],
-            'claude-3-haiku-20240307': results[4],
-            'claude-3-5-sonnet-20240620': results[5],
-            'claude-3-opus-20240229': results[6]
+          'gemini-1.5-pro-exp-0801': results[2],
+          'gpt-4o-mini': results[3],
+          'gpt-4o-2024-08-06': results[4],
+          'claude-3-haiku-20240307': results[5],
+          'claude-3-5-sonnet-20240620': results[6],
+          'claude-3-opus-20240229': results[7]
           };
   
           return new Response(JSON.stringify(response), {
